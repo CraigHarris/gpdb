@@ -71,6 +71,11 @@
 #include "nodes/makefuncs.h"
 #include "postmaster/autostats.h"
 
+/* Hooks for plugins into CopyFrom */
+ProcessCopyBegin_hook_type ProcessCopyBegin_hook = NULL;
+ProcessCopyInsert_hook_type ProcessCopyInsert_hook = NULL;
+ProcessCopyFinish_hook_type ProcessCopyFinish_hook = NULL;
+
 /* DestReceiver for COPY (SELECT) TO */
 typedef struct
 {
@@ -4237,8 +4242,8 @@ CopyFrom(CopyState cstate)
 					/*
 					 * OK, store the tuple and create index entries for it
 					 */
-					if (ProcessInsert_hook) {
-						(*ProcessInsert_hook)(cstate);
+					if (ProcessCopyInsert_hook) {
+						(*ProcessCopyInsert_hook)(cstate);
 					}
 					else if (relstorage == RELSTORAGE_AOROWS)
 					{
