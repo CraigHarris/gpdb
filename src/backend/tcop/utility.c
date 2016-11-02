@@ -69,6 +69,10 @@
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbvars.h"
 
+
+/* Hook for plugins to get control in ProcessUtility() */
+ProcessUtility_hook_type ProcessUtility_hook = NULL;
+
 /*
  * Error-checking support for DROP commands
  */
@@ -698,13 +702,48 @@ CheckRestrictedOperation(const char *cmdname)
  */
 void
 ProcessUtility(Node *parsetree,
-			   const char *queryString,
-			   ParamListInfo params,
-			   bool isTopLevel,
-			   DestReceiver *dest,
-			   char *completionTag)
+               const char *queryString,
+               ParamListInfo params,
+               bool isTopLevel,
+               DestReceiver *dest,
+               char *completionTag)
 {
 	Assert(queryString != NULL);	/* required as of 8.4 */
+
+	/*
+	 * We provide a function hook variable that lets loadable plugins get
+	 * control when ProcessUtility is called.  Such a plugin would normally
+	 * call standard_ProcessUtility().
+	 */
+	if (ProcessUtility_hook)
+		(*ProcessUtility_hook) (parsetree, queryString,
+                                params, isTopLevel,
+                                dest, completionTag);
+	else
+		standard_ProcessUtility(parsetree, queryString,
+                                params, isTopLevel,
+                                dest, completionTag);
+}
+
+/*
+ * standard_ProcessUtility itself deals only with utility commands for
+ * which we do not provide event trigger support.  Commands that do have
+ * such support are passed down to ProcessUtilitySlow, which contains the
+ * necessary infrastructure for such triggers.
+ *
+ * This division is not just for performance: it's critical that the
+ * event trigger code not be invoked when doing START TRANSACTION for
+ * example, because we might need to refresh the event trigger cache,
+ * which requires being in a valid transaction.
+ */
+void
+standard_ProcessUtility(Node *parsetree,
+                        const char *queryString,
+                        ParamListInfo params,
+                        bool isTopLevel,
+                        DestReceiver *dest,
+                        char *completionTag)
+{
 
 	check_xact_readonly(parsetree);
 
