@@ -16,9 +16,9 @@
 
 #include "c.h"
 #include "nodes/parsenodes.h"
+#include "utils/rel.h"
 #include "tcop/dest.h"
 #include "executor/executor.h"
-
 
 /*
  * Represents the different source/dest cases we need to worry about at
@@ -246,6 +246,16 @@ typedef struct CopyStateData
 } CopyStateData;
 
 typedef CopyStateData *CopyState;
+
+/* Hook for plugins to get control in CopyFrom() */
+typedef void (*ProcessCopyBegin_hook_type) (Relation rel);
+extern PGDLLIMPORT ProcessCopyBegin_hook_type ProcessCopyBegin_hook;
+
+typedef void (*ProcessCopyInsert_hook_type) (CopyState cstate);
+extern PGDLLIMPORT ProcessCopyInsert_hook_type ProcessCopyInsert_hook;
+
+typedef void (*ProcessCopyFinish_hook_type) ();
+extern PGDLLIMPORT ProcessCopyFinish_hook_type ProcessCopyFinish_hook;
 
 
 #define ISOCTAL(c) (((c) >= '0') && ((c) <= '7'))

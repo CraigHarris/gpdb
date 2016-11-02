@@ -4088,7 +4088,10 @@ CopyFrom(CopyState cstate)
 				}
 
 				relstorage = RelinfoGetStorage(resultRelInfo);
-				if (relstorage == RELSTORAGE_AOROWS &&
+				if (ProcessCopyBegin_hook) {
+					(*ProcessCopyBegin_hook)( cstate->rel );
+				}
+				else if (relstorage == RELSTORAGE_AOROWS &&
 					resultRelInfo->ri_aoInsertDesc == NULL)
 				{
 					ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
@@ -4234,7 +4237,10 @@ CopyFrom(CopyState cstate)
 					/*
 					 * OK, store the tuple and create index entries for it
 					 */
-					if (relstorage == RELSTORAGE_AOROWS)
+					if (ProcessInsert_hook) {
+						(*ProcessInsert_hook)(cstate);
+					}
+					else if (relstorage == RELSTORAGE_AOROWS)
 					{
 						Oid			tupleOid;
 						AOTupleId	aoTupleId;
@@ -4340,13 +4346,16 @@ CopyFrom(CopyState cstate)
 	resultRelInfo = estate->es_result_relations;
 	for (i = estate->es_num_result_relations; i > 0; i--)
 	{
-			if (resultRelInfo->ri_aoInsertDesc)
+			if (ProcessCopyFinish_hook)
+				(*ProcessCopyFinish_hook)();
+
+			else if (resultRelInfo->ri_aoInsertDesc)
 					appendonly_insert_finish(resultRelInfo->ri_aoInsertDesc);
 
-			if (resultRelInfo->ri_aocsInsertDesc)
+			else if (resultRelInfo->ri_aocsInsertDesc)
 					aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
 
-			if (resultRelInfo->ri_extInsertDesc)
+			else if (resultRelInfo->ri_extInsertDesc)
 					external_insert_finish(resultRelInfo->ri_extInsertDesc);
 			
 			/* Close indices and then the relation itself */
