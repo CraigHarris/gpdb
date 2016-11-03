@@ -3841,6 +3841,10 @@ CopyFrom(CopyState cstate)
 
 	CopyInitDataParser(cstate);
 
+	if (ProcessCopyBegin_hook) {
+		(*ProcessCopyBegin_hook)( cstate->rel );
+	}
+
 	do
 	{
 		size_t		bytesread = 0;
@@ -4093,10 +4097,7 @@ CopyFrom(CopyState cstate)
 				}
 
 				relstorage = RelinfoGetStorage(resultRelInfo);
-				if (ProcessCopyBegin_hook) {
-					(*ProcessCopyBegin_hook)( cstate->rel );
-				}
-				else if (relstorage == RELSTORAGE_AOROWS &&
+				if (relstorage == RELSTORAGE_AOROWS &&
 					resultRelInfo->ri_aoInsertDesc == NULL)
 				{
 					ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
