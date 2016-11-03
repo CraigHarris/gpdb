@@ -2951,7 +2951,7 @@ CopyFromDispatch(CopyState cstate)
 
 	values = (Datum *) palloc(num_phys_attrs * sizeof(Datum));
 	nulls = (bool *) palloc(num_phys_attrs * sizeof(bool));
-	attr_offsets = (int *) palloc(num_phys_attrs * sizeof(int));
+	cstate->attr_offsets = attr_offsets = (int *) palloc(num_phys_attrs * sizeof(int));
 
 	/* Set up callback to identify error line number */
 	errcontext.callback = copy_in_error_callback;
