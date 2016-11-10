@@ -93,12 +93,14 @@ ExecInitCustomScan(CustomScan *cscan, EState *estate, int eflags)
 	 */
 	if (cscan->custom_scan_tlist != NIL || scan_rel == NULL)
 	{
-#ifdef PG95
+
 		// index-only scan? GP doesn't define INDEX_VAR
 		TupleDesc	scan_tupdesc;
 
 		scan_tupdesc = ExecTypeFromTL(cscan->custom_scan_tlist, false);
 		ExecAssignScanType(&css->ss, scan_tupdesc);
+
+#ifdef PG95
 		/* Node's targetlist will contain Vars with varno = INDEX_VAR */
 		tlistvarno = INDEX_VAR;
 #endif
