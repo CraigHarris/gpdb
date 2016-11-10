@@ -58,7 +58,18 @@ ExecInitCustomScan(CustomScan *cscan, EState *estate, int eflags)
 					 (PlanState *) css);
 
 	/* tuple table initialization */
+#ifndef PG95
+	if (css->ss->ps.plan->scanrelid) {
+		// For table scans
+		ExecInitScanTupleSlot(estate, &css->ss);
+	}
+	else {
+		// For tuple-table-slot scans (typically over Motion nodes)
+		css->ss->ss_ScanTupleSlot = ExecAllocTableSlot(&estate->es_tupleTable);
+	}
+#else
 	ExecInitScanTupleSlot(estate, &css->ss);
+#endif
 	ExecInitResultTupleSlot(estate, &css->ss.ps);
 
 	/*
