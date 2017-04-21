@@ -24,6 +24,8 @@ cd gpdb
 #
 ./configure --prefix=/usr/local/gpdb --disable-gpfdist
 
+# add --enable-debug for Greenplum symbols
+
 
 make
 sudo make install

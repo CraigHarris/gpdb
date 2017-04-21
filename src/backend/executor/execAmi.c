@@ -143,6 +143,10 @@ ExecReScan(PlanState *node, ExprContext *exprCtxt)
 			ExecReScanBitmapOr((BitmapOrState *) node, exprCtxt);
 			break;
 
+        case T_CustomScanState:
+            ExecReScanCustomScan((CustomScanState *) node, exprCtxt);
+            break;
+
 		case T_SeqScanState:
 		case T_AppendOnlyScanState:
 		case T_AOCSScanState:
@@ -339,6 +343,9 @@ ExecMarkPos(PlanState *node)
 				));
 			break;
 
+
+        // FIXME: eventually generate code for ExecCustomMarkPos
+        // Until then, shouldn't have CustomScans under MergeJoins
 		default:
 			/* don't make hard error unless caller asks to restore... */
 			elog(DEBUG2, "unrecognized node type: %d", (int) nodeTag(node));
@@ -417,6 +424,9 @@ ExecRestrPos(PlanState *node)
 				));
 			break;
 
+        // FIXME: eventually generate code for ExecCustomMarkPos
+        // Until then, shouldn't have CustomScans under MergeJoins
+        case T_CustomScanState:
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(node));
 			break;
@@ -616,6 +626,7 @@ ExecEagerFree(PlanState *node)
 		case T_BitmapAndState:
 		case T_BitmapOrState:
 		case T_BitmapIndexScanState:
+        case T_CustomScanState:
 		case T_LimitState:
 		case T_MotionState:
 		case T_NestLoopState:
@@ -843,6 +854,7 @@ ExecEagerFreeChildNodes(PlanState *node, bool subplanDone)
 		}
 			
 		case T_MotionState:
+        case T_CustomScanState:
 		{
 			/* do nothing */
 			break;
