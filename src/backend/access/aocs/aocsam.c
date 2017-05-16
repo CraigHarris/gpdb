@@ -45,6 +45,8 @@
 
 #include "utils/debugbreak.h"
 
+#include <time.h>
+
 static AOCSScanDesc
 aocs_beginscan_internal(Relation relation,
 		AOCSFileSegInfo **seginfo,
@@ -57,7 +59,10 @@ aocs_beginscan_internal(Relation relation,
  * Open the segment file for a specified column
  * associated with the datum stream.
  */
-static void open_datumstreamread_segfile(
+#ifdef NATIVE_GREENPLUM
+static
+#endif
+void open_datumstreamread_segfile(
 									 char *basepath, RelFileNode node,
 									 AOCSFileSegInfo *segInfo,
 									 DatumStreamRead *ds,
@@ -271,7 +276,10 @@ static void aocs_initscan(AOCSScanDesc scan)
     pgstat_count_heap_scan(scan->aos_rel);
 }
 
-static int open_next_scan_seg(AOCSScanDesc scan)
+#ifdef NATIVE_GREENPLUM
+static
+#endif
+int open_next_scan_seg(AOCSScanDesc scan)
 {
     int nvp = scan->relationTupleDesc->natts;
 
@@ -348,7 +356,10 @@ static int open_next_scan_seg(AOCSScanDesc scan)
     return -1;
 }
 
-static void close_cur_scan_seg(AOCSScanDesc scan)
+#ifdef NATIVE_GREENPLUM
+static
+#endif
+void close_cur_scan_seg(AOCSScanDesc scan)
 {
     int nvp = scan->relationTupleDesc->natts;
 
@@ -520,6 +531,8 @@ void aocs_endscan(AOCSScanDesc scan)
     pfree(scan);
 }
 
+static double block_time = 0.0;
+
 void aocs_getnext(AOCSScanDesc scan, ScanDirection direction, TupleTableSlot *slot)
 {
 	int ncol;
@@ -548,7 +561,7 @@ ReadNext:
 			{
 				/* No more seg, we are at the end */
 				ExecClearTuple(slot);
-				scan->cur_seg = -1;
+                printf( "block time: %f\n", block_time );
 				return;
 			}
 			scan->cur_seg_row = 0;
@@ -561,7 +574,23 @@ ReadNext:
 		{
 			if(scan->proj[i])
 			{
-				err = datumstreamread_advance(scan->ds[i]);
+#if 1
+                DatumStreamBlockRead* dsr = &scan->ds[i]->blockRead;
+                ++dsr->nth;
+                if (dsr->nth >= dsr->logical_row_count) {
+                    err = 0;
+                }
+                else {
+                    ++dsr->physical_datum_index;
+                    if (dsr->physical_datum_index != 0) {
+                        dsr->datump += dsr->typeInfo.datumlen;
+                    }
+                    err = 1;
+                }
+#else
+                err = datumstreamread_advance(scan->proj[i]);
+#endif
+
 				Assert(err >= 0);
 				if(err == 0)
 				{
@@ -574,7 +603,7 @@ ReadNext:
 						close_cur_scan_seg(scan);
 						goto ReadNext;
 					}
-
+#if 0
 					if (scan->buildBlockDirectory)
 					{
 						Assert(scan->blockDirectory != NULL);
@@ -585,8 +614,23 @@ ReadNext:
 															 scan->ds[i]->blockFileOffset,
 															 scan->ds[i]->blockRowCount);
 					}
-
+#endif
+                    dsr = &scan->ds[i]->blockRead;
+#if 1
+                    ++dsr->nth;
+                    if (dsr->nth >= dsr->logical_row_count) {
+                        err = 0;
+                    }
+                    else {
+                        ++dsr->physical_datum_index;
+                        if (dsr->physical_datum_index != 0) {
+                            dsr->datump += dsr->typeInfo.datumlen;
+                        }
+                        err = 1;
+                    }
+#else
 					err = datumstreamread_advance(scan->ds[i]);
+#endif
 					Assert(err > 0);
 				}
 
@@ -594,8 +638,13 @@ ReadNext:
 				 * Get the column's datum right here since the data structures should still
 				 * be hot in CPU data cache memory.
 				 */
-				datumstreamread_get(scan->ds[i], &d[i], &null[i]);
-
+#if 1
+                null[i] = false;
+                d[i] = *(uint32*)dsr->datump;
+#else
+                datumstreamread_get(scan->ds[i], &d[i], &null[i]);
+#endif
+#if 0
 				if (rowNum == INT64CONST(-1) &&
 					scan->ds[i]->blockFirstRowNum != INT64CONST(-1))
 				{
@@ -604,14 +653,15 @@ ReadNext:
 						datumstreamread_nth(scan->ds[i]);
 
 				}
+#endif
 			}
 		}
-
+#if 0
 		AOTupleIdInit_Init(&aoTupleId);
 		AOTupleIdInit_segmentFileNum(&aoTupleId,
 									 scan->seginfo[scan->cur_seg]->segno);
 
-		scan->cur_seg_row++;
+        scan->cur_seg_row++;
 		if (rowNum == INT64CONST(-1))
 		{
 			AOTupleIdInit_rowNum(&aoTupleId, scan->cur_seg_row);
@@ -630,6 +680,10 @@ ReadNext:
 
         TupSetVirtualTupleNValid(slot, ncol);
         slot_set_ctid(slot, &(scan->cdb_fake_ctid));
+#else
+        scan->cur_seg_row++;
+        TupSetVirtualTupleNValid(slot, ncol);
+#endif
         return;
     }
 

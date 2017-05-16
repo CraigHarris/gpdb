@@ -23,7 +23,10 @@ static TupleTableSlot *AOCSNext(AOCSScanState *node)
  * Open/close underlying table.
  * Resource acquire and release 
  */
-static void OpenAOCSScanRelation(AOCSScanState *node)
+#ifdef NATIVE_GREENPLUM
+static
+#endif
+void OpenAOCSScanRelation(AOCSScanState *node)
 {
 	Snapshot appendOnlyMetaDataSnapshot;
 
@@ -49,8 +52,11 @@ static void OpenAOCSScanRelation(AOCSScanState *node)
 
 	node->ss.scan_state = SCAN_SCAN;
 }
- 
-static void CloseAOCSScanRelation(AOCSScanState *node)
+
+#ifdef NATIVE_GREENPLUM
+static
+#endif
+void CloseAOCSScanRelation(AOCSScanState *node)
 {
 	Assert((node->ss.scan_state & SCAN_SCAN) != 0);
         aocs_endscan(node->scandesc);
